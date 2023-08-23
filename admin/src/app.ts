@@ -4,6 +4,9 @@ import { AppDataSource } from "./data-source";
 import { Request,Response } from "express";
 import { Product } from "./entity/product";
 import { json } from "stream/consumers";
+import * as amqp from "amqplib";
+
+console.clear();
 
 
 // AppDataSource.initialize().then(() => {
@@ -15,10 +18,16 @@ import { json } from "stream/consumers";
         const dataSource = await AppDataSource.initialize();
         const productRepository = dataSource.getRepository(Product);
         const app = express();
+
+        
         app.use(express.json());
         app.use(cors({
             origin: ["http://localhost:3000",]
         }));
+        
+        // RabbitMQ Connection
+        const connection = await amqp.connect('amqp://localhost',)
+        const channel = await connection.createChannel();
 
         app.get ("/api/products",async (req:Request,res:Response) => {
             const products = await productRepository.find();
@@ -30,8 +39,18 @@ import { json } from "stream/consumers";
             console.log({title,image});
             const product = await productRepository.create({title,image});
             const result = await productRepository.save(product);
+            channel.sendToQueue("product_created",Buffer.from(JSON.stringify(result)));
             return res.send(result);
         });
+
+        app.put("/api/products/:id",async(req:Request,res:Response) => {
+            const {id} = req.params;
+            const product = await productRepository.findOneBy({id:parseInt(id)});
+            productRepository.merge(product,req.body);
+            const result = await productRepository.save(product);
+            channel.sendToQueue("product_updated",Buffer.from(JSON.stringify(result)));
+            return res.send(result);
+        })
 
         app.get ("/api/products/:id",async (req:Request,res:Response) => {
             const {id} = req.params;
@@ -43,6 +62,8 @@ import { json } from "stream/consumers";
         app.delete("/api/products/:id",async(req: Request, res: Response) => {
             const {id} = req.params;
             const result = await productRepository.delete(id);
+            channel.sendToQueue("product_deleted",Buffer.from(id));
+            return res.send(result);
         });
 
         app.post("/api/products/:id/like",async (req:Request,res:Response) => {

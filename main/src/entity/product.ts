@@ -5,11 +5,11 @@ import { Column, Entity, ObjectIdColumn, PrimaryGeneratedColumn } from "typeorm"
 @Entity()
 export class Product{
     @ObjectIdColumn()
-    id:string;
+    _id:ObjectId;
 
     @Column({unique: true})
     admin_id: number;
-
+ 
     @Column()
     title: string
 

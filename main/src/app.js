@@ -41,12 +41,11 @@ var cors = require("cors");
 var data_source_1 = require("./data-source");
 var product_1 = require("./entity/product");
 var amqp = require("amqplib");
+var axios_1 = require("axios");
+var mongodb_1 = require("mongodb");
 console.clear();
-// AppDataSource.initialize().then(() => {
-//     console.log("Data Source has been initialized!");}).catch((err) => {
-//     console.error("Error during Data Source initialization", err);});
 (function () { return __awaiter(void 0, void 0, void 0, function () {
-    var dataSource, productRepository_1, app, connection, channel_1, error_1;
+    var dataSource, productRepository_1, app, connection_1, channel, error_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -60,12 +59,9 @@ console.clear();
                 app.use(cors({
                     origin: ["http://localhost:3000",]
                 }));
-                return [4 /*yield*/, amqp.connect('amqp://localhost')];
-            case 2:
-                connection = _a.sent();
-                return [4 /*yield*/, connection.createChannel()];
-            case 3:
-                channel_1 = _a.sent();
+                app.listen(8001, function () {
+                    console.log("Listening on port 8001");
+                });
                 app.get("/api/products", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
                     var products;
                     return __generator(this, function (_a) {
@@ -73,94 +69,101 @@ console.clear();
                             case 0: return [4 /*yield*/, productRepository_1.find()];
                             case 1:
                                 products = _a.sent();
-                                res.json(products);
-                                return [2 /*return*/];
-                        }
-                    });
-                }); });
-                app.post("/api/products", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-                    var _a, title, image, product, result;
-                    return __generator(this, function (_b) {
-                        switch (_b.label) {
-                            case 0:
-                                _a = req.body, title = _a.title, image = _a.image;
-                                console.log({ title: title, image: image });
-                                return [4 /*yield*/, productRepository_1.create({ title: title, image: image })];
-                            case 1:
-                                product = _b.sent();
-                                return [4 /*yield*/, productRepository_1.save(product)];
-                            case 2:
-                                result = _b.sent();
-                                channel_1.sendToQueue("product_created", Buffer.from(JSON.stringify(result)));
-                                return [2 /*return*/, res.send(result)];
-                        }
-                    });
-                }); });
-                app.put("/api/products/:id", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-                    var id, product, result;
-                    return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                id = req.params.id;
-                                return [4 /*yield*/, productRepository_1.findOneBy({ id: parseInt(id) })];
-                            case 1:
-                                product = _a.sent();
-                                productRepository_1.merge(product, req.body);
-                                return [4 /*yield*/, productRepository_1.save(product)];
-                            case 2:
-                                result = _a.sent();
-                                channel_1.sendToQueue("product_updated", Buffer.from(JSON.stringify(result)));
-                                return [2 /*return*/, res.send(result)];
-                        }
-                    });
-                }); });
-                app.get("/api/products/:id", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-                    var id, product;
-                    return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                id = req.params.id;
-                                return [4 /*yield*/, productRepository_1.findOneBy({ id: parseInt(id) })];
-                            case 1:
-                                product = _a.sent();
-                                res.json(product);
-                                return [2 /*return*/];
-                        }
-                    });
-                }); });
-                app.delete("/api/products/:id", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-                    var id, result;
-                    return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                id = req.params.id;
-                                return [4 /*yield*/, productRepository_1.delete(id)];
-                            case 1:
-                                result = _a.sent();
-                                channel_1.sendToQueue("product_deleted", Buffer.from(id));
-                                return [2 /*return*/, res.send(result)];
+                                return [2 /*return*/, res.json(products)];
                         }
                     });
                 }); });
                 app.post("/api/products/:id/like", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-                    var id, product, result;
+                    var id, product, error_2;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0:
+                                _a.trys.push([0, 3, , 4]);
                                 id = req.params.id;
-                                return [4 /*yield*/, productRepository_1.findOneBy({ id: parseInt(id) })];
+                                return [4 /*yield*/, productRepository_1.findOneBy({ _id: new mongodb_1.ObjectId(id) })];
                             case 1:
                                 product = _a.sent();
+                                axios_1.default.post("http://localhost:8000/api/products/".concat(product.admin_id, "/like"), {});
                                 product.likes++;
                                 return [4 /*yield*/, productRepository_1.save(product)];
                             case 2:
-                                result = _a.sent();
-                                return [2 /*return*/, res.send(result)];
+                                _a.sent();
+                                return [2 /*return*/, res.json(product)];
+                            case 3:
+                                error_2 = _a.sent();
+                                console.log(error_2);
+                                return [3 /*break*/, 4];
+                            case 4: return [2 /*return*/];
                         }
                     });
                 }); });
-                app.listen(8000, function () {
-                    console.log("Listening on port 8000");
+                return [4 /*yield*/, amqp.connect('amqp://localhost')];
+            case 2:
+                connection_1 = _a.sent();
+                return [4 /*yield*/, connection_1.createChannel()];
+            case 3:
+                channel = _a.sent();
+                channel.assertQueue("product_created", { durable: false });
+                channel.assertQueue("product_updated", { durable: false });
+                channel.assertQueue("product_deleted", { durable: false });
+                channel.consume("product_created", function (msg) { return __awaiter(void 0, void 0, void 0, function () {
+                    var eventProduct, product;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                eventProduct = JSON.parse(msg.content.toString());
+                                product = new product_1.Product();
+                                product.admin_id = parseInt(eventProduct.id);
+                                product.title = eventProduct.title;
+                                product.image = eventProduct.image;
+                                product.likes = eventProduct.likes;
+                                return [4 /*yield*/, productRepository_1.save(product)];
+                            case 1:
+                                _a.sent();
+                                console.log("product created");
+                                return [2 /*return*/];
+                        }
+                    });
+                }); }, { noAck: true });
+                channel.consume("product_updated", function (msg) { return __awaiter(void 0, void 0, void 0, function () {
+                    var eventProduct, product;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                eventProduct = JSON.parse(msg.content.toString());
+                                return [4 /*yield*/, productRepository_1.findOneBy({ admin_id: parseInt(eventProduct.id) })];
+                            case 1:
+                                product = _a.sent();
+                                productRepository_1.merge(product, {
+                                    title: eventProduct.title,
+                                    image: eventProduct.image,
+                                    likes: eventProduct.likes
+                                });
+                                return [4 /*yield*/, productRepository_1.save(product)];
+                            case 2:
+                                _a.sent();
+                                console.log("product updated");
+                                return [2 /*return*/];
+                        }
+                    });
+                }); }, { noAck: true });
+                channel.consume("product_deleted", function (msg) { return __awaiter(void 0, void 0, void 0, function () {
+                    var admin_id;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                admin_id = parseInt(msg.content.toString());
+                                return [4 /*yield*/, productRepository_1.delete({ admin_id: admin_id })];
+                            case 1:
+                                _a.sent();
+                                console.log("product deleted");
+                                return [2 /*return*/];
+                        }
+                    });
+                }); }, { noAck: true });
+                process.on("beforeExit", function () {
+                    console.log("Closing");
+                    connection_1.close();
                 });
                 return [3 /*break*/, 5];
             case 4:
